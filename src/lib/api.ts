@@ -2,12 +2,54 @@ import type { BlogPost, Certification, Project } from '@/types/content';
 
 const sameOriginApiBase = '/api/v1';
 
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 function cleanApiBaseUrl(value: string | undefined) {
   return value?.trim().replace(/\/$/, '');
 }
 
+function isAbsoluteApiBaseUrl(value: string | undefined) {
+  return /^https?:\/\//i.test(value || '');
+}
+
 export function getApiBaseUrl() {
-  return cleanApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL) || sameOriginApiBase;
+  const publicApiBase = cleanApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
+
+  if (globalThis.window === undefined) {
+    const internalApiBase = cleanApiBaseUrl(process.env.INTERNAL_API_BASE_URL);
+    if (internalApiBase) {
+      return internalApiBase;
+    }
+    if (isAbsoluteApiBaseUrl(publicApiBase)) {
+      return publicApiBase;
+    }
+
+    throw new Error(
+      'Server-side API requests require INTERNAL_API_BASE_URL or an absolute NEXT_PUBLIC_API_BASE_URL',
+    );
+  }
+
+  return publicApiBase || sameOriginApiBase;
+}
+
+async function getErrorMessage(response: Response, fallback: string) {
+  const contentType = response.headers.get('Content-Type') || '';
+
+  if (contentType.includes('application/json')) {
+    const body = (await response.json().catch(() => null)) as { detail?: unknown; message?: unknown } | null;
+    const message = body?.detail || body?.message;
+    if (typeof message === 'string' && message.trim()) {
+      return message;
+    }
+  }
+
+  const text = await response.text().catch(() => '');
+  return text.trim() || fallback;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -22,7 +64,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     cache: 'no-store',
   });
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    throw new ApiError(await getErrorMessage(response, `API request failed: ${response.status}`), response.status);
   }
   return response.json() as Promise<T>;
 }
@@ -63,7 +105,7 @@ export const api = {
       body: formData,
     });
     if (!response.ok) {
-      throw new Error(`Upload failed: ${response.status}`);
+      throw new ApiError(await getErrorMessage(response, `Upload failed: ${response.status}`), response.status);
     }
     return response.json();
   },
