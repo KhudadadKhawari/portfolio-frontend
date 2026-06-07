@@ -18,6 +18,7 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     NEXT_SERVER_PORT=3001 \
     NEXT_SERVER_HOSTNAME=127.0.0.1
+RUN npm install -g npm@11.16.0
 RUN apk add --no-cache nginx su-exec \
     && addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 --ingroup nodejs nextjs \
