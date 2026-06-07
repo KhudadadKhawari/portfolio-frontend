@@ -1,18 +1,24 @@
 import type { BlogPost, Certification, Project } from '@/types/content';
 
-const fallbackApiBase = 'http://localhost:8000/api/v1';
+const sameOriginApiBase = '/api/v1';
+
+function cleanApiBaseUrl(value: string | undefined) {
+  return value?.trim().replace(/\/$/, '');
+}
 
 export function getApiBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_BASE_URL || fallbackApiBase;
+  return cleanApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL) || sameOriginApiBase;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers || {}),
-    },
+    headers,
     cache: 'no-store',
   });
   if (!response.ok) {

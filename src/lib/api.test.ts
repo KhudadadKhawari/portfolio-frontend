@@ -1,9 +1,21 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api, getApiBaseUrl } from './api';
 
 describe('api client', () => {
-  it('uses the local backend default', () => {
-    expect(getApiBaseUrl()).toContain('/api/v1');
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('uses the same-origin API default', () => {
+    vi.stubEnv('NEXT_PUBLIC_API_BASE_URL', '');
+
+    expect(getApiBaseUrl()).toBe('/api/v1');
+  });
+
+  it('uses the public API environment value', () => {
+    vi.stubEnv('NEXT_PUBLIC_API_BASE_URL', 'https://portfolio.seferyak.com/api/v1/');
+
+    expect(getApiBaseUrl()).toBe('https://portfolio.seferyak.com/api/v1');
   });
 
   it('sends login requests as json', async () => {

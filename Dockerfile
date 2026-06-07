@@ -7,19 +7,23 @@ RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
-ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_API_BASE_URL=/api/v1
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
 FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
+ARG NEXT_PUBLIC_API_BASE_URL=/api/v1
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL} \
     NEXT_SERVER_PORT=3001 \
     NEXT_SERVER_HOSTNAME=127.0.0.1
-RUN npm install -g npm@11.16.0
-RUN apk add --no-cache nginx su-exec \
+RUN npm install -g npm@11.16.0 \
+    && apk add --no-cache nginx su-exec \
     && addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 --ingroup nodejs nextjs \
     && mkdir -p /run/nginx /var/cache/nginx /var/lib/nginx/tmp \

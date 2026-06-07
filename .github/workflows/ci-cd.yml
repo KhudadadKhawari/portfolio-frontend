@@ -55,6 +55,8 @@ jobs:
           push: false
           load: true
           tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=https://portfolio.seferyak.com/api/v1
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -70,6 +72,8 @@ jobs:
           tags: |
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.IMAGE_NAME }}:latest
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=https://portfolio.seferyak.com/api/v1
       - name: Deploy container over SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
