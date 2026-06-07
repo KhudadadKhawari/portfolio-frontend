@@ -1,23 +1,35 @@
-FROM node:20-alpine AS deps
+ARG NODE_IMAGE=node:22-alpine
+
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-FROM node:20-alpine AS builder
+FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
-    NEXT_TELEMETRY_DISABLED=1
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-USER nextjs
+    NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_SERVER_PORT=3001 \
+    NEXT_SERVER_HOSTNAME=127.0.0.1
+RUN apk add --no-cache nginx su-exec \
+    && addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 --ingroup nodejs nextjs \
+    && mkdir -p /run/nginx /var/cache/nginx /var/lib/nginx/tmp \
+    && chown -R nginx:nginx /run/nginx /var/cache/nginx /var/lib/nginx
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY docker/entrypoint.sh /entrypoint.sh
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+RUN chmod +x /entrypoint.sh
 EXPOSE 3000
-CMD ["node", "server.js"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
+    CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
+ENTRYPOINT ["/entrypoint.sh"]
